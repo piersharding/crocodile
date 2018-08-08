@@ -35,8 +35,11 @@ RUN \
     && mv git-lfs-*/git-lfs /usr/bin/ && rm -rf git-lfs-* \
     && git lfs install
 
+COPY Makefile /src/crocodile/examples/grid/Makefile
+
 RUN cd /src/crocodile/examples/grid \
-    && make test_config
+    && make test_config \
+    && make recombine
 
 
 # vim:set ft=dockerfile:
