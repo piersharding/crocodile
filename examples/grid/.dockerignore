@@ -1,0 +1,6 @@
+chart/
+.ssh/
+.git/
+PrivateRules.mak
+*.yaml
+*.yml
