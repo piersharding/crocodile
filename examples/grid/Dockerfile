@@ -101,7 +101,7 @@ EXPOSE 2022
 CMD ["/init.sh"]
 
 RUN \
-    git clone "${arg_crocodile_repo}" --branch io_benchmark --single-branch --depth 1 /src/crocodile
+    git clone "${arg_crocodile_repo}" --branch io_benchmark_k8s --single-branch --depth 1 /src/crocodile
 
 WORKDIR /src/crocodile
 ENV HOME /src/crocodile
@@ -112,10 +112,8 @@ RUN \
     && mv git-lfs-*/git-lfs /usr/bin/ && rm -rf git-lfs-* \
     && git lfs install
 
-COPY Makefile /src/crocodile/examples/grid/Makefile
-COPY boot_recombine.sh /src/crocodile/examples/grid/boot_recombine.sh
-
 RUN cd /src/crocodile/examples/grid \
+    && make clean \
     && make test_config \
     && make recombine \
     && make grid

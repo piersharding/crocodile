@@ -203,12 +203,26 @@ k8s-recombine:
 	       --report-bindings \
 	       --display-map \
 	       --timestamp-output \
-	       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) -npernode 2 \
+	       --tag-output \
+	       --map-by node \
+	       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) \
 	       -x OMP_NUM_THREADS=16 \
+	       -x OMP_PROC_BIND=spread \
+	       -x OMP_PLACES=cores \
 	       /src/crocodile/examples/grid/recombine \
-	       --rec-set=large \
+	       --rec-set=small \
 	       --vis-set=lowbd2 \
+	       --time=-230:230/256/64 \
+	       --freq=-225e6:300e6/4096/64 \
 	       /cache/out%d.h5
+
+
+# variable options:
+# OMP_NUM_THREADS=32,16,12
+# OMP_PROC_BIND=true,spread
+# OMP_PLACES=sockets,cores
+	       # -npernode 2 \
+# -npernode 2,4,8
 	       # --mca btl tcp,sm,self \
 	       # --mca btl_tcp_if_include eth0 \
 
