@@ -50,13 +50,17 @@ UBUNTU_TAG ?= 18.04
 
 TEST_PATH ?= tmp
 
+# do we enable RADOS on the crocodile build?
+RADOS ?=
+GRID_RADOS ?=
+
 # define overides for above variables in here
 -include PrivateRules.mak
 
 HDF5_INC ?= /usr/include/hdf5/serial
 HDF5_LIB ?= /usr/lib/x86_64-linux-gnu/hdf5/serial
 
-CFLAGS += -Wall -fopenmp -ffast-math -I$(HDF5_INC) -O2
+CFLAGS += -Wall -fopenmp -ffast-math -I$(HDF5_INC) -O2 $(RADOS)
 LDFLAGS += -fopenmp -O2
 LDLIBS = -L$(HDF5_LIB) -lm -lhdf5 -lfftw3
 CC = mpicc
@@ -71,9 +75,22 @@ test_recombine : $(TEST_RECOMBINE_OBJS)
 recombine : $(BENCH_RECOMBINE_OBJS)
 test_config : $(CONFIG_OBJS)
 
+rados_file_create:
+	$(CC) h5rados_file_create.c $(LDFLAGS) $(LDLIBS) -lrados -o h5rados_file_create
+
+rados_dset_create:
+	$(CC) h5rados_dset_create.c $(LDFLAGS) $(LDLIBS) -lrados -o h5rados_dset_create
+
+rados_dset_write:
+	$(CC) h5rados_dset_write.c $(LDFLAGS) $(LDLIBS) -lrados -o h5rados_dset_write
+
+rados_dset_read:
+	$(CC) h5rados_dset_read.c $(LDFLAGS) $(LDLIBS) -lrados -o h5rados_dset_read
+
 .PHONY: clean
 clean :
 	rm -f $(GRID_OBJS) $(BENCH_RECOMBINE_OBJS) $(TEST_RECOMBINE_OBJS) $(CONFIG_OBJS) grid test_recombine recombine test_config
+	rm -f Dockerfile.echo Dockerfile.opr
 
 build:
 	  # --build-arg UBUNTU_BASED_BASE_IMAGE=$(KUBE_OPENMPI_REPOSITORY):$(KUBE_OPENMPI_VERSION) \
@@ -85,9 +102,9 @@ build:
 	  --build-arg SSH_UID=$(SSH_UID) \
 	  --build-arg SSH_GID=$(SSH_GID) \
 	  --build-arg 'arg_crocodile_repo=$(CROCODILE_REPO)' \
+	  --build-arg 'arg_grid_rados=$(GRID_RADOS)' \
 	  --build-arg 'arg_openmpi_pkg=$(KUBE_OPENMPI_PKG)' \
 	  -t $(DOCKER_IMAGE) -f $(DOCKERFILE) .
-
 
 push: build
 	@echo ""
@@ -100,7 +117,7 @@ push: build
 	docker tag $(DOCKER_IMAGE) $(DOCKER_REPO):$(TAG)
 	docker push $(DOCKER_REPO):$(TAG)
 
-test: build
+run:
 	@CTNR=`$(DOCKER) ps -q -f name=$(NAME)` && \
 	if [ -n "$${CTNR}" ]; then $(DOCKER) rm -f $(NAME); fi
 	@echo ''
@@ -109,10 +126,19 @@ test: build
 	@echo '                     or run "make test_test_recombine"'
 	@echo '#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#'
 	@echo ''
+
+
+	echo $(DOCKER) run --rm --name $(NAME) --hostname $(NAME) \
+					-w /src/crocodile/examples/grid \
+					--volume $$(pwd)/../../data:/src/crocodile/data \
+		            -ti $(DOCKER_IMAGE) bash
+
 	$(DOCKER) run --rm --name $(NAME) --hostname $(NAME) \
 					-w /src/crocodile/examples/grid \
 					--volume $$(pwd)/../../data:/src/crocodile/data \
 		            -ti $(DOCKER_IMAGE) bash
+
+test: build run
 
 test_test_config:
 	mkdir -p $(TEST_PATH)
@@ -120,6 +146,20 @@ test_test_config:
 
 test_test_recombine:
 	mpirun --allow-run-as-root -n 2 ./recombine --rec-set=T05
+
+test_h5rados_file_create:
+	./h5rados_file_create testfilecreate1.h5
+
+test_h5rados_dset_create:
+	./h5rados_dset_create testfilecreate1.h5 test1 2 2
+
+test_h5rados_dset_write:
+	./h5rados_dset_write testfilecreate1.h5 test1
+
+test_h5rados_dset_read:
+	./h5rados_dset_read testfilecreate1.h5 test1
+
+h5radostests: test_h5rados_file_create test_h5rados_dset_create test_h5rados_dset_write test_h5rados_dset_read
 
 checkvars:
 	@echo ""
@@ -135,7 +175,7 @@ checkvars:
 
 all: tiller-acls helm
 
-k8s-clean:
+k8s-clean: clean
 	rm -f ssh-key.yaml
 	@echo "I'm clean!"
 
@@ -191,7 +231,6 @@ k8s-test:
 	  --display-map -n $$(($(REPLICAS)+1)) -npernode 1 \
 	  sh -c 'echo $$(hostname).crocodile:hello'
 
-
 k8s-recombine:
 	echo $$((($(REPLICAS)+1)*$(NO_PROCESS)))
 	kubectl -n $(KUBE_NAMESPACE) exec -it $(MPI_CLUSTER_NAME)-master -c mpi-master -- \
@@ -200,6 +239,7 @@ k8s-recombine:
 	       -wd /src/crocodile/examples/grid \
 	       -v \
 	       --allow-run-as-root \
+	       --mca btl_tcp_if_exclude lo,docker0 \
 	       --report-bindings \
 	       --display-map \
 	       --timestamp-output \
@@ -248,3 +288,53 @@ docker_nfs_site_files:
 	-e SHARED_DIRECTORY=/default itsthenetwork/nfs-server-alpine:latest
 
 services: docker_nfs_site_files
+
+.ONESHELL:
+Dockerfile.echo:
+	cat <<- EOF > $@
+		FROM gitlab.catalyst.net.nz:4567/piers/k8s-hack/kube-grid:openmpi18.04
+		MAINTAINER Piers Harding "piers@catalyst.net.nz"
+		CMD mpiexec --allow-run-as-root \
+			--display-map \
+			sh -c 'echo $$(hostname).crocodile:hello'
+	EOF
+
+.ONESHELL:
+Dockerfile.opr:
+	cat <<- EOF > $@
+		FROM gitlab.catalyst.net.nz:4567/piers/k8s-hack/kube-grid:openmpi18.04
+		MAINTAINER Piers Harding "piers@catalyst.net.nz"
+		CMD mpiexec --allow-run-as-root \
+			--display-map \
+			sh -c 'echo $$(hostname).crocodile:hello'
+		CMD mpirun \
+		       -wd /src/crocodile/examples/grid \
+		       -v \
+		       --allow-run-as-root \
+		       --mca btl_tcp_if_exclude lo,docker0 \
+		       --report-bindings \
+		       --display-map \
+		       --timestamp-output \
+		       --tag-output \
+		       --map-by node \
+		       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) \
+		       -x OMP_NUM_THREADS=16 \
+		       -x OMP_PROC_BIND=spread \
+		       -x OMP_PLACES=cores \
+		       /src/crocodile/examples/grid/recombine \
+		       --rec-set=small \
+		       --vis-set=lowbd2 \
+		       --time=-230:230/256/64 \
+		       --freq=-225e6:300e6/4096/64 \
+		       /cache/out%d.h5
+	EOF
+
+echo: Dockerfile.echo
+	docker build -t $(IMG):echo -f Dockerfile.echo .
+	docker tag $(IMG):echo $(DOCKER_REPO):echo
+	docker push $(DOCKER_REPO):echo
+
+opr: Dockerfile.opr
+	docker build -t $(IMG):opr -f Dockerfile.opr .
+	docker tag $(IMG):opr $(DOCKER_REPO):opr
+	docker push $(DOCKER_REPO):opr
