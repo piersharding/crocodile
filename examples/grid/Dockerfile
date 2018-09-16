@@ -85,6 +85,11 @@ RUN cd /tmp && \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
   # if ! grep "cosmic universe" /etc/apt/sources.list; then echo "deb http://nz.archive.ubuntu.com/ubuntu/ cosmic universe" >> /etc/apt/sources.list;fi
 
+# install HDF5
+# RUN apt-get update && \
+#   apt-get install -y git make gcc libhdf5-dev libfftw3-dev ${arg_openmpi_pkg} && \
+#   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 
 # build HDF5
 RUN \

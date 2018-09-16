@@ -17,7 +17,10 @@
 
 #include "grid.h"
 
+#include "grid_rados.h"
+
 int main(int argc, char *argv[]) {
+
 
     // Read parameters
     static struct option options[] =
@@ -60,6 +63,34 @@ int main(int argc, char *argv[]) {
         default: invalid = 1; break;
         }
     }
+
+    // initialise file access property list
+    fapl = H5P_DEFAULT; // overridden if using rados
+
+// #ifdef GRID_ON_RADOS
+//     rados_t cluster;
+//     char *pool = "kubernetes";
+//     char *user = "kubernetes";
+//     fapl = -1;
+
+//     if(rados_create(&cluster, user) < 0)
+//         ERROR;
+//     if(rados_conf_read_file(cluster, "ceph.conf") < 0)
+//         ERROR;
+
+//     /* Initialize VOL */
+//     if(H5VLrados_init(cluster, pool) < 0)
+//         ERROR;
+
+//     /* Set up FAPL */
+//     if((fapl = H5Pcreate(H5P_FILE_ACCESS)) < 0)
+//         ERROR;
+//     if(H5Pset_fapl_rados(fapl, MPI_COMM_WORLD, MPI_INFO_NULL) < 0)
+//         ERROR;
+//     if(H5Pset_all_coll_metadata_ops(fapl, true) < 0)
+//         ERROR;
+// #endif // GRID_ON_RADOS
+
 
     // Check grid parameters
     int grid_size = (int)(theta * lambda);
@@ -236,7 +267,7 @@ int main(int argc, char *argv[]) {
         printf("Write grid...\n");
         int i;
         for (i = 0; i < grid_size; i++) {
-            write(grid_fd, uvgrid + i * grid_size, grid_byte_size / grid_size);
+            if(write(grid_fd, uvgrid + i * grid_size, grid_byte_size / grid_size)); // ignore return
         }
         close(grid_fd);
     }
@@ -263,10 +294,16 @@ int main(int argc, char *argv[]) {
             for (j = 0; j < grid_size; j++) {
                 row[j] = creal(uvgrid[i*grid_size+j]);
             }
-            write(image_fd, row, sizeof(double) * grid_size);
+            if(write(image_fd, row, sizeof(double) * grid_size)); // ignore return
         }
         close(image_fd);
     }
+
+
+// #ifdef GRID_ON_RADOS
+//     if(H5Pclose(fapl) < 0)
+//         ERROR;
+// #endif // GRID_ON_RADOS
 
     return 0;
 }

@@ -2,6 +2,8 @@
 #include "grid.h"
 #include "config.h"
 
+#include "grid_rados.h"
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -434,6 +436,8 @@ bool set_cmdarg_config(int argc, char **argv,
 }
 
 int main(int argc, char *argv[]) {
+
+    fapl = H5P_DEFAULT; // overridden if using rados
 
     // Initialise MPI, read configuration (we need multi-threading support)
     int world_rank, world_size;

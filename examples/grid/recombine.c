@@ -411,7 +411,7 @@ void recombine2d_pf0_ft0_omp(struct recombine2d_worker *worker,
     struct recombine2d_config *cfg = worker->cfg;
 
     assert(cfg->BF_stride1 == 1);
-    assert(cfg->NMBF_BF_stride0 = 1);
+    assert(cfg->NMBF_BF_stride0 == 1);
     assert(cfg->BF_stride0 == cfg->NMBF_BF_stride1);
 
     int y;

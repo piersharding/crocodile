@@ -693,7 +693,7 @@ void convolve_aw_kernels(struct bl_data *bl,
             int a1i = bl->antenna1 * akern->time_count * akern->freq_count + atime * akern->freq_count + freq;
             int a2i = bl->antenna2 * akern->time_count * akern->freq_count + atime * akern->freq_count + freq;
             struct a_kernel *a1k = &akern->kern_by_atf[a1i];
-            struct a_kernel *a2k = &akern->kern_by_atf[a2i];
+            struct a_kernel *a2k = &akern->kern_by_atf[a2i]; if (a2k->freq); // ignore unused
             double w = uvw_m_to_l(bl->uvw_m[time*3+2], a1k->freq);
             int w_plane = (int)floor((w - wkern->w_min) / wkern->w_step + .5);
             struct w_kernel *wk = &wkern->kern_by_w[w_plane];

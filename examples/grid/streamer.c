@@ -2,6 +2,8 @@
 #include "grid.h"
 #include "config.h"
 
+#include "grid_rados.h"
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
@@ -566,7 +568,7 @@ bool streamer_init(struct streamer *streamer,
 
         // Open file and "vis" group
         printf("\nCreating %s... ", filename);
-        streamer->vis_file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+        streamer->vis_file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
         streamer->vis_group = H5Gcreate(streamer->vis_file, "vis", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         if (streamer->vis_file < 0 || streamer->vis_group < 0) {
             fprintf(stderr, "Could not open visibility file %s!\n", filename);

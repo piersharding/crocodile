@@ -585,6 +585,8 @@ int T05_config()
 
 int main(int argc, char *argv[]) {
 
+    fapl = H5P_DEFAULT; // overridden if using rados
+
     int count = 0,fails = 0;
 
 #define RUN_TEST(t)                               \

@@ -61,21 +61,21 @@ void disable_perf_counters(struct perf_counters *counter)
 static uint64_t read_perf_counter(int counter_fd)
 {
     uint64_t values[3] = { 0, 0 };
-    read(counter_fd, &values, sizeof(values));
+    if(read(counter_fd, &values, sizeof(values))); // ignore return
     return values[0];
 }
 
 static uint64_t read_perf_counter_enabled(int counter_fd)
 {
     uint64_t values[3] = { 0, 0 };
-    read(counter_fd, &values, sizeof(values));
+    if(read(counter_fd, &values, sizeof(values))); // ignore return
     return values[1];
 }
 
 static uint64_t read_perf_counter_running(int counter_fd)
 {
     uint64_t values[3] = { 0, 0 };
-    read(counter_fd, &values, sizeof(values));
+    if(read(counter_fd, &values, sizeof(values))); // ignore return
     return values[2];
 }
 

@@ -2,6 +2,8 @@
 #include "grid.h"
 #include "config.h"
 
+#include "grid_rados.h"
+
 #include <hdf5.h>
 #include <stdlib.h>
 #include <time.h>
@@ -28,7 +30,7 @@ void simple_benchmark(const char *filename,
             data[j] = 1111111111;
     }
 
-    hid_t vis_f = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    hid_t vis_f = H5Fopen(filename, H5F_ACC_RDWR, fapl);
     hid_t vis_g = H5Gopen(vis_f, "vis", H5P_DEFAULT);
 
     double write_start = get_time_ns();
@@ -102,6 +104,9 @@ void simple_benchmark(const char *filename,
 
 int main(int argc, char *argv[])
 {
+
+    fapl = H5P_DEFAULT; // overridden if using rados
+
     init_dtype_cpx();
 
     // Initialise MPI, read configuration (we need multi-threading support)
@@ -167,7 +172,7 @@ int main(int argc, char *argv[])
 
         // Open file
         printf("\nCreating %s... ", filename);
-        hid_t vis_f = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+        hid_t vis_f = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
         if (vis_f < 0) {
             fprintf(stderr, "Could not visibility file %s!\n", filename);
             return 1;
