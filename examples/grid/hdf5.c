@@ -1,8 +1,6 @@
 
 #include "grid.h"
 
-#include "grid_rados.h"
-
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -30,7 +28,8 @@ bool load_ant_config(const char *filename, struct ant_config *cfg) {
 
     // Open file
     printf("Reading %s...\n", filename);
-    hid_t cfg_f = H5Fopen(filename, H5F_ACC_RDONLY, fapl);
+
+    hid_t cfg_f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (cfg_f < 0) {
         fprintf(stderr, "Could not open antenna configuration file %s!\n", filename);
         return false;
@@ -44,7 +43,7 @@ bool load_ant_config(const char *filename, struct ant_config *cfg) {
 
     // Read name
     hid_t name_a;
-    if ((name_a = H5Aopen(cfg_g, "name", fapl)) < 0 ||
+    if ((name_a = H5Aopen(cfg_g, "name", H5P_DEFAULT)) < 0 ||
         H5Tget_class(H5Aget_type(name_a)) != H5T_STRING ||
         H5Aread(name_a, H5Aget_type(name_a), &cfg->name) < 0) {
 
@@ -203,7 +202,7 @@ int load_vis(const char *filename, struct vis_data *vis,
 
     // Open file
     printf("Reading %s...\n", filename);
-    hid_t vis_f = H5Fopen(filename, H5F_ACC_RDONLY, fapl);
+    hid_t vis_f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (vis_f < 0) {
         fprintf(stderr, "Could not open visibility file %s!\n", filename);
         return 1;
@@ -228,7 +227,7 @@ int load_vis(const char *filename, struct vis_data *vis,
     hid_t type_a; char *type_str;
     int bl = 0;
     if (H5Aexists(vis_g, "type") &&
-        (type_a = H5Aopen(vis_g, "type", fapl)) >= 0 &&
+        (type_a = H5Aopen(vis_g, "type", H5P_DEFAULT)) >= 0 &&
         H5Tget_class(H5Aget_type(type_a)) == H5T_STRING &&
         H5Aread(type_a, H5Aget_type(type_a), &type_str) >= 0 &&
         strcmp(type_str, "Visibility") == 0) {
@@ -544,7 +543,7 @@ int load_sep_kern(const char *filename, struct sep_kernel_data *sepkern)
 {
 
     // Open file
-    hid_t sepkern_f = H5Fopen(filename, H5F_ACC_RDONLY, fapl);
+    hid_t sepkern_f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (sepkern_f < 0) {
         fprintf(stderr, "Could not open separable kernel file %s!\n", filename);
         return 1;
@@ -598,7 +597,7 @@ int load_sep_kern(const char *filename, struct sep_kernel_data *sepkern)
 int load_wkern(const char *filename, double theta, struct w_kernel_data *wkern) {
 
     // Open file
-    hid_t wkern_f = H5Fopen(filename, H5F_ACC_RDONLY, fapl);
+    hid_t wkern_f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (wkern_f < 0) {
         fprintf(stderr, "Could not open w kernel file %s!\n", filename);
         return 1;
@@ -711,7 +710,7 @@ int load_akern(const char *filename, double theta, struct a_kernel_data *akern) 
     char akern_name[64];
 
     // Open file
-    hid_t akern_f = H5Fopen(filename, H5F_ACC_RDONLY, fapl);
+    hid_t akern_f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (akern_f < 0) {
         fprintf(stderr, "Could not open A kernel file %s!\n", filename);
         return 1;
@@ -911,7 +910,7 @@ int write_dump(void *data, int size, char *name, ...) {
 
 int get_npoints_hdf5(char *file, char *name, ...)
 {
-    hid_t f = H5Fopen(file, H5F_ACC_RDONLY, fapl);
+    hid_t f = H5Fopen(file, H5F_ACC_RDONLY, H5P_DEFAULT);
     va_list ap;
     va_start(ap, name);
     char dname[256];
@@ -924,7 +923,7 @@ int get_npoints_hdf5(char *file, char *name, ...)
 
 void *read_hdf5(int size, char *file, char *name, ...)
 {
-    hid_t f = H5Fopen(file, H5F_ACC_RDONLY, fapl);
+    hid_t f = H5Fopen(file, H5F_ACC_RDONLY, H5P_DEFAULT);
     va_list ap;
     va_start(ap, name);
     char dname[256];

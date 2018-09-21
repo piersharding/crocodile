@@ -437,7 +437,9 @@ bool set_cmdarg_config(int argc, char **argv,
 
 int main(int argc, char *argv[]) {
 
-    fapl = H5P_DEFAULT; // overridden if using rados
+#ifdef GRID_ON_RADOS
+    fprintf(stderr, "\n\nVisibility output goes to RADOS ... \n\n");
+#endif // GRID_ON_RADOS
 
     // Initialise MPI, read configuration (we need multi-threading support)
     int world_rank, world_size;

@@ -62,6 +62,13 @@ spec:
         secret:
           secretName: {{ .Release.Name }}-ssh-key
           defaultMode: 256
+      - name: {{ .Release.Name }}-ceph-config
+        configMap:
+          name: {{ .Release.Name }}-ceph-config
+          items:
+          - key: ceph.conf
+            path: ceph.conf
+            mode: 365
       - name: kube-openmpi-utils
         configMap:
           name: {{ .Release.Name }}-assets
@@ -119,9 +126,15 @@ spec:
       - name: mpi-worker
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          capabilities:
+            add:
+            - SYS_PTRACE
         ports:
         - containerPort: 2022
         volumeMounts:
+        - name: {{ .Release.Name }}-ceph-config
+          mountPath: /etc/ceph
         - name: kube-openmpi-ssh-key
           mountPath: /ssh-key/openmpi
         - name: kube-openmpi-utils
@@ -179,6 +192,13 @@ spec:
 {{- end}}
 {{- end }}
   volumes:
+  - name: {{ .Release.Name }}-ceph-config
+    configMap:
+      name: {{ .Release.Name }}-ceph-config
+      items:
+      - key: ceph.conf
+        path: ceph.conf
+        mode: 365
   - name: kube-openmpi-guillotine
     emptyDir: {}
   - name: kube-openmpi-hostfile-dir
@@ -268,6 +288,10 @@ spec:
   - name: mpi-master
     image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
     imagePullPolicy: {{ .Values.image.pullPolicy }}
+    securityContext:
+      capabilities:
+        add:
+        - SYS_PTRACE
     ports:
     - containerPort: 2022
     env:
@@ -284,6 +308,8 @@ spec:
 {{ .Values.mpiMaster.oneShot.command | indent 6 }}
     {{- end }}
     volumeMounts:
+    - name: {{ .Release.Name }}-ceph-config
+      mountPath: /etc/ceph
     - name: kube-openmpi-guillotine
       mountPath: /kube-openmpi/guillotine
     - name: kube-openmpi-ssh-key

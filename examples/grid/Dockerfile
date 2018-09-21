@@ -44,12 +44,20 @@ RUN \
     # apt-get install -y git make gcc libhdf5-dev libfftw3-dev libopenmpi-dev
 
 RUN \
+    apt-get update -y && \
     apt-get install -y git make gcc \
                        autoconf automake gfortran \
                        libtool libtool-bin \
                        zlib1g-dev libsz2 libaec-dev \
-                       librados-dev libfftw3-dev ${arg_openmpi_pkg}
-    # apt-get install -y git make gcc libhdf5-dev libfftw3-dev ${arg_openmpi_pkg}
+                       librados-dev libfftw3-dev \
+                       gdb  ${arg_openmpi_pkg} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+COPY ./gstack.sh /usr/bin/gstack.sh
+COPY ./gstack.sh /usr/bin/gstack
+RUN chmod a+x /usr/bin/gstack.sh /usr/bin/gstack
+
 
 #
 # install openmpi
@@ -82,6 +90,7 @@ RUN cd /tmp && \
    libopenmpi-dev libopenmpi2 openmpi-common openmpi-bin; \
   fi && \
   mpirun -V && \
+  apt-get clean && \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
   # if ! grep "cosmic universe" /etc/apt/sources.list; then echo "deb http://nz.archive.ubuntu.com/ubuntu/ cosmic universe" >> /etc/apt/sources.list;fi
 
@@ -91,6 +100,34 @@ RUN cd /tmp && \
 #   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 
+# RUN \
+#     git clone https://bitbucket.hdfgroup.org/scm/~nfortne2/hdf5_naf.git \
+#      --branch hdf5_rados --single-branch --depth 1 /tmp/src && \
+#     cd /tmp/src && \
+#     ./autogen.sh && \
+#     export CC=/usr/bin/mpicc && \
+#     export LIBS="-lrados" && \
+#     export CPPFLAGS="-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include -I/usr/lib/x86_64-linux-gnu/openmpi/include" && \
+#     export LDFLAGS="-pthread -L/usr/lib -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi_cxx -lmpi -lrados -lpthread -lsz -lz -ldl -lm" && \
+#     ./configure --prefix=/usr --host=x86_64-linux-gnu \
+#           --build=x86_64-linux-gnu \
+#            --enable-parallel=yes \
+#           --libdir=/usr/lib/x86_64-linux-gnu \
+#           --mandir=/usr/share/man \
+#           --with-default-plugindir=/usr/lib/x86_64-linux-gnu/hdf5/plugins \
+#           --with-pthread \
+#           --enable-unsupported \
+#           --enable-shared \
+#            --enable-build-mode=production \
+#           --disable-sharedlib-rpath --with-zlib --with-default-api-version=v18 \
+#           --with-szlib \
+#           --enable-fortran \
+#           --enable-threadsafe --enable-cxx && \
+#           make VERBOSE=1 V=1 && \
+#           make check-s && \
+#           make install && \
+#           cd /tmp && rm -rf /tmp/src
+
 # build HDF5
 RUN \
     git clone https://bitbucket.hdfgroup.org/scm/~nfortne2/hdf5_naf.git \
@@ -98,27 +135,67 @@ RUN \
     cd /tmp/src && \
     ./autogen.sh && \
     export CC=/usr/bin/mpicc && \
-    export LIBS="-lrados" && \
-    export CPPFLAGS="-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include -I/usr/lib/x86_64-linux-gnu/openmpi/include" && \
-    export LDFLAGS="-pthread -L/usr/lib -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi_cxx -lmpi -lrados -lpthread -lsz -lz -ldl -lm" && \
-    ./configure --prefix=/usr --host=x86_64-linux-gnu \
-          --build=x86_64-linux-gnu \
-           --enable-parallel=yes \
-          --libdir=/usr/lib/x86_64-linux-gnu \
-          --mandir=/usr/share/man \
-          --with-default-plugindir=/usr/lib/x86_64-linux-gnu/hdf5/plugins \
-          --with-pthread \
-          --enable-unsupported \
-          --enable-shared \
-           --enable-build-mode=production \
-          --disable-sharedlib-rpath --with-zlib --with-default-api-version=v18 \
-          --with-szlib \
-          --enable-fortran \
-          --enable-threadsafe --enable-cxx && \
-          make VERBOSE=1 V=1 && \
-          make check-s && \
+    export LDFLAGS="-lrados -lpthread -lz" && \
+    ./configure --prefix=/usr \
+                --enable-parallel \
+                --with-pthread \
+                --enable-shared \
+                --enable-build-mode=debug \
+                --with-zlib && \
+          make && \
           make install && \
           cd /tmp && rm -rf /tmp/src
+
+# build HDF5
+
+# RUN \
+#     git clone https://bitbucket.hdfgroup.org/scm/~nfortne2/hdf5_naf.git \
+#      --branch hdf5_rados --single-branch --depth 1 /tmp/src && \
+#     cd /tmp/src && \
+#     ./autogen.sh && \
+#     export CC=/usr/bin/mpicc && \
+#     export LDFLAGS="-lrados -lz" && \
+#     ./configure --prefix=/usr \
+#                 --enable-parallel \
+#                 --enable-threadsafe \
+#                 --enable-unsupported \
+#                 --enable-build-mode=debug \
+#                 --with-zlib && \
+#           make && \
+#           make install && \
+#           cd /tmp && rm -rf /tmp/src
+
+COPY ./hdf5_naf /tmp/src
+
+# RUN \
+#     cd /tmp/src && \
+#     ./autogen.sh && \
+#     export CC=/usr/bin/mpicc && \
+#     export LDFLAGS="-lrados -lz" && \
+#     ./configure --prefix=/usr \
+#                 --enable-parallel \
+#                 --enable-threadsafe \
+#                 --enable-unsupported \
+#                 --enable-build-mode=debug \
+#                 --with-zlib && \
+#           make && \
+#           make install && \
+#           cd /tmp && rm -rf /tmp/src
+
+# RUN \
+#     cd /tmp/src && \
+#     ./autogen.sh && \
+#     export CC=/usr/bin/mpicc && \
+#     export LDFLAGS="-lrados -lpthread -lz" && \
+#     ./configure --prefix=/usr \
+#                 --enable-parallel \
+#                 --with-pthread \
+#                 --enable-shared \
+#                 --enable-build-mode=debug \
+#                 --with-zlib && \
+#           make && \
+#           make install && \
+#           cd /tmp && rm -rf /tmp/src
 
 # Create ssh user(openmpi) and setup ssh key dir
 # - ssh identity file and authorized key file is expected to
@@ -160,16 +237,16 @@ COPY ./*.c /src/crocodile/examples/grid/
 
 ARG arg_grid_rados
 RUN \
-    echo "Are we enabling RADOS: ${arg_grid_rados}"
-
-RUN cd /src/crocodile/examples/grid \
+    echo "Are we enabling RADOS: ${arg_grid_rados}" \
+    && cd /src/crocodile/examples/grid \
     && make clean \
+    && make checkvars ${arg_grid_rados} \
     && make test_config ${arg_grid_rados} \
     && make recombine ${arg_grid_rados} \
-    && make grid ${arg_grid_rados}
+    && make grid ${arg_grid_rados} \
+    && rm -f *.o
 
 COPY ./h5* /src/crocodile/examples/grid/
-COPY ./ceph.conf /src/crocodile/examples/grid/
 
 RUN cd /src/crocodile/examples/grid \
     && make rados_file_create \

@@ -1,5 +1,5 @@
 image:
-  repository: everpeace/kube-openmpi
+  repository: somerepo/kube-openmpi
   tag: 0.7.0
   pullPolicy: IfNotPresent
   # pullSecrets:

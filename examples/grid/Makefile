@@ -2,8 +2,8 @@ MAKE_DBG ?= ""
 KUBE_NAMESPACE ?= "mpi"
 MPI_CLUSTER_NAME ?= "crocodile"
 NODE ?= minikube
-REPLICAS ?= 3
-NO_PROCESS ?= 2
+REPLICAS ?= 1
+NO_PROCESS ?= 1
 PULL_SECRET ?= ""
 GITLAB_USER ?= ""
 CI_BUILD_TOKEN ?= ""
@@ -57,12 +57,15 @@ GRID_RADOS ?=
 # define overides for above variables in here
 -include PrivateRules.mak
 
-HDF5_INC ?= /usr/include/hdf5/serial
-HDF5_LIB ?= /usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5_INC=/usr/include/hdf5/serial
+HDF5_LIB=/usr/lib/x86_64-linux-gnu/hdf5/serial
 
 CFLAGS += -Wall -fopenmp -ffast-math -I$(HDF5_INC) -O2 $(RADOS)
 LDFLAGS += -fopenmp -O2
 LDLIBS = -L$(HDF5_LIB) -lm -lhdf5 -lfftw3
+ifdef RADOS
+	LDLIBS += -lrados
+endif
 CC = mpicc
 
 GRID_OBJS = main.o grid.o hdf5.o perf.o
@@ -165,6 +168,9 @@ checkvars:
 	@echo ""
 	@echo "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
 	@echo "Variables set  ... :"
+	@echo "CFLAGS: $(CFLAGS)"
+	@echo "LDFLAGS: $(LDFLAGS)"
+	@echo "LDLIBS: $(LDLIBS)"
 	@echo "DOCKER_HOST (Docker Host - set HOST and/or DOCKER_HOST): $(DOCKER_HOST)"
 	@echo "GITLAB_USER (Docker registry user - set GITLAB_USER and CI_BUILD_TOKEN also used for k8s helm deploy): $(GITLAB_USER)"
 	@echo "CI_REGISTRY_IMAGE (Registry Image - set CI_REGISTRY_IMAGE): $(CI_REGISTRY_IMAGE)"
@@ -173,7 +179,7 @@ checkvars:
 	@echo "HOST: $(HOST)"
 	@echo "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
 
-all: tiller-acls helm
+all: launch-tiller helm
 
 k8s-clean: clean
 	rm -f ssh-key.yaml
@@ -243,18 +249,44 @@ k8s-recombine:
 	       --report-bindings \
 	       --display-map \
 	       --timestamp-output \
+	       --get-stack-traces \
+	       --timeout 30 \
+	       --report-state-on-timeout \
 	       --tag-output \
 	       --map-by node \
 	       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) \
 	       -x OMP_NUM_THREADS=16 \
 	       -x OMP_PROC_BIND=spread \
 	       -x OMP_PLACES=cores \
+	       -x HDF5_DEBUG=trace \
 	       /src/crocodile/examples/grid/recombine \
 	       --rec-set=small \
 	       --vis-set=lowbd2 \
 	       --time=-230:230/256/64 \
 	       --freq=-225e6:300e6/4096/64 \
 	       /cache/out%d.h5
+
+
+
+k8s-hdf5-test:
+	echo $$((($(REPLICAS)+1)*$(NO_PROCESS)))
+	kubectl -n $(KUBE_NAMESPACE) exec -it $(MPI_CLUSTER_NAME)-master -c mpi-master -- \
+	mpirun --hostfile /kube-openmpi/generated/hostfile \
+	       --mca orte_keep_fqdn_hostnames 1 \
+	       -wd /src/crocodile/examples/grid \
+	       -v \
+	       --allow-run-as-root \
+	       --mca btl_tcp_if_exclude lo,docker0 \
+	       --report-bindings \
+	       --display-map \
+	       --timestamp-output \
+	       --tag-output \
+	       --map-by node \
+	       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) \
+	       -x OMP_PROC_BIND=spread \
+	       -x OMP_PLACES=cores \
+	       /src/crocodile/examples/grid/h5rados_file_create \
+	       testfilecreatempi1.h5
 
 
 # variable options:
@@ -280,14 +312,17 @@ delete: template
 rmi:
 	$(DOCKER) rmi $(DOCKER_IMAGE)
 
-docker_nfs_site_files:
+nfs:
 	CONTAINER_EXISTS=$$($(DOCKER) ps -aqf ancestor=itsthenetwork/nfs-server-alpine) && \
 	if [ -n "$${CONTAINER_EXISTS}" ]; then $(DOCKER) rm -f $${CONTAINER_EXISTS}; fi
-	docker run -d --name nfs --privileged -p 2049:2049 \
-	-v $(CURRENT_DIR)/sites/default:/default \
-	-e SHARED_DIRECTORY=/default itsthenetwork/nfs-server-alpine:latest
+	docker run -d --name nfs --net=host --privileged -p 2049:2049 \
+	-v /home/piers/git/private/SKA-crocodile/data:/data \
+	-e SHARED_DIRECTORY=/data itsthenetwork/nfs-server-alpine:latest
 
-services: docker_nfs_site_files
+	# -v $$(pwd)/../../data:/data \
+
+
+services: nfs
 
 .ONESHELL:
 Dockerfile.echo:

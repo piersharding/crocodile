@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
 
     if(rados_create(&cluster, user) < 0)
         ERROR;
-    if(rados_conf_read_file(cluster, "ceph.conf") < 0)
+    if(rados_conf_read_file(cluster, "/etc/ceph/ceph.conf") < 0)
         ERROR;
 
     /* Initialize VOL */

@@ -566,15 +566,64 @@ bool streamer_init(struct streamer *streamer,
         char filename[512];
         sprintf(filename, wcfg->vis_path, subgrid_worker);
 
+        // initialise file access property list
+        fapl = H5P_DEFAULT; // overridden if using rados
+
+#ifdef GRID_ON_RADOS
+        rados_t cluster;
+        char *pool = "kubernetes";
+        char *user = "kubernetes";
+        fapl = -1;
+
+        fprintf(stderr, "Initialising RADOS connection to pool/user %s/%s... \n", pool, user);
+        if(rados_create(&cluster, user) < 0) {
+            fprintf(stderr, "ERROR: Could not rados_create!\n");
+            return false;
+        }
+        fprintf(stderr, "done rados_create\n");
+        if(rados_conf_read_file(cluster, "/etc/ceph/ceph.conf") < 0) {
+            fprintf(stderr, "ERROR: Could not rados_conf_read_file!\n");
+            return false;
+        }
+        fprintf(stderr, "done rados_conf_read_file\n");
+
+        /* Initialize VOL */
+        if(H5VLrados_init(cluster, pool) < 0) {
+            fprintf(stderr, "ERROR: Could not H5VLrados_init!\n");
+            return false;
+        }
+        fprintf(stderr, "done H5VLrados_init\n");
+
+        /* Set up FAPL */
+        if((fapl = H5Pcreate(H5P_FILE_ACCESS)) < 0) {
+            fprintf(stderr, "ERROR: Could not H5Pcreate fapl!\n");
+            return false;
+        }
+        fprintf(stderr, "done H5Pcreate\n");
+        if(H5Pset_fapl_rados(fapl, MPI_COMM_WORLD, MPI_INFO_NULL) < 0) {
+            fprintf(stderr, "ERROR: Could not H5Pset_fapl_rados!\n");
+            return false;
+        }
+        fprintf(stderr, "done H5Pset_fapl_rados\n");
+        if(H5Pset_all_coll_metadata_ops(fapl, true) < 0) {
+            fprintf(stderr, "ERROR: Could not H5Pset_all_coll_metadata_ops!\n");
+            return false;
+        }
+        fprintf(stderr, "Completed Initialising RADOS connection\n");
+#endif // GRID_ON_RADOS
+
         // Open file and "vis" group
-        printf("\nCreating %s... ", filename);
+        fprintf(stderr, "\nCreating %s... \n", filename);
         streamer->vis_file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
+        fprintf(stderr, "\nOpened file %s... \n", filename);
         streamer->vis_group = H5Gcreate(streamer->vis_file, "vis", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        fprintf(stderr, "\nOpened group %s... \n", filename);
         if (streamer->vis_file < 0 || streamer->vis_group < 0) {
             fprintf(stderr, "Could not open visibility file %s!\n", filename);
         } else {
             create_bl_groups(streamer->vis_group, wcfg, subgrid_worker);
         }
+
 
         H5Fflush(streamer->vis_file, H5F_SCOPE_LOCAL);
     }
@@ -739,6 +788,11 @@ void streamer(struct work_config *wcfg, int subgrid_worker, int *producer_ranks)
 
     if (streamer.vis_group >= 0) {
         H5Gclose(streamer.vis_group); H5Fclose(streamer.vis_file);
+
+#ifdef GRID_ON_RADOS
+        H5Pclose(fapl);
+#endif // GRID_ON_RADOS
+
     }
 
     double stream_time = get_time_ns() - stream_start;
