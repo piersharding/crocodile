@@ -2,6 +2,7 @@ MAKE_DBG ?= ""
 KUBE_NAMESPACE ?= "mpi"
 MPI_CLUSTER_NAME ?= "crocodile"
 NODE ?= minikube
+DRIVER ?= local
 REPLICAS ?= 1
 NO_PROCESS ?= 1
 PULL_SECRET ?= ""
@@ -11,8 +12,8 @@ CI_REGISTRY = gitlab.catalyst.net.nz:4567
 CI_REGISTRY_IMAGE ?= $(CI_REGISTRY)/piers/k8s-hack/kube-grid
 NFS_SERVER ?= 192.168.0.168
 GITLAB_USER_EMAIL ?= ""
-KUBE_OPENMPI_REPOSITORY ?= ubuntu
-KUBE_OPENMPI_VERSION ?= 18.04
+# KUBE_OPENMPI_REPOSITORY ?= ubuntu
+# KUBE_OPENMPI_VERSION ?= 18.04
 # KUBE_OPENMPI_REPOSITORY ?= gitlab.catalyst.net.nz:4567/piers/k8s-hack/kube-openmpi
 # KUBE_OPENMPI_VERSION ?= 0.7.0
 #KUBE_OPENMPI_PKG ?= libopenmpi-dev
@@ -33,8 +34,8 @@ DOCKER_USER ?= ""
 DOCKER_PASSWORD ?= ""
 CURRENT_DIR = $(shell pwd)
 
-KUBE_OPENMPI_VERSION ?= 0.7.0
-REPOSITORY ?= gitlab.catalyst.net.nz:4567/piers/k8s-hack/kube-openmpi
+# KUBE_OPENMPI_VERSION ?= 0.7.0
+# REPOSITORY ?= gitlab.catalyst.net.nz:4567/piers/k8s-hack/kube-openmpi
 
 OPENMPI_VERSION ?= 2.1.2
 WITH_OPENMPI_BUILD ?= false
@@ -45,8 +46,10 @@ SSH_UID ?= 1000
 SSH_GID ?= 1000
 
 # Args for Base Image
-UBUNTU_REPOSITORY ?= ubuntu
-UBUNTU_TAG ?= 18.04
+# UBUNTU_REPOSITORY ?= ubuntu
+UBUNTU_REPOSITORY ?= piersharding/mpibase
+# UBUNTU_TAG ?= 18.04
+UBUNTU_TAG ?= latest
 
 TEST_PATH ?= tmp
 
@@ -221,8 +224,23 @@ template: ssh-key.yaml
 	  --set image.pullSecrets.name=$(PULL_SECRET) \
 	  --set image.pullPolicy=Always \
 	  --set nodeSelector."kubernetes\.io/hostname"=$(NODE) \
-	  --set mpiWorkers.num=$(REPLICAS) \
+	  --set mpiWorkers.num="$(REPLICAS)" \
 	    > mpi.yml
+
+
+teardown: delete rmbeegfs rmbeegfscsi
+
+beegfs: namespace beegfscsi
+	kubectl -n $(KUBE_NAMESPACE) apply -f beegfs-pvc.yml
+
+rmbeegfs:
+	kubectl -n $(KUBE_NAMESPACE) delete -f beegfs-pvc.yml
+
+beegfscsi:
+	kubectl -n $(KUBE_NAMESPACE) apply -f beegfs-driver/$(DRIVER)/
+
+rmbeegfscsi:
+	kubectl -n $(KUBE_NAMESPACE) delete -f beegfs-driver/$(DRIVER)/
 
 helm: template regisry-creds
 	kubectl -n $(KUBE_NAMESPACE) apply -f mpi.yml
@@ -250,15 +268,12 @@ k8s-recombine:
 	       --display-map \
 	       --timestamp-output \
 	       --get-stack-traces \
-	       --timeout 30 \
 	       --report-state-on-timeout \
-	       --tag-output \
 	       --map-by node \
 	       -np $$((($(REPLICAS)+1)*$(NO_PROCESS))) \
 	       -x OMP_NUM_THREADS=16 \
 	       -x OMP_PROC_BIND=spread \
 	       -x OMP_PLACES=cores \
-	       -x HDF5_DEBUG=trace \
 	       /src/crocodile/examples/grid/recombine \
 	       --rec-set=small \
 	       --vis-set=lowbd2 \
@@ -266,7 +281,9 @@ k8s-recombine:
 	       --freq=-225e6:300e6/4096/64 \
 	       /cache/out%d.h5
 
-
+	       # --timeout 30 \
+	       # --tag-output \
+	       # -x HDF5_DEBUG=trace
 
 k8s-hdf5-test:
 	echo $$((($(REPLICAS)+1)*$(NO_PROCESS)))
@@ -307,7 +324,7 @@ k8s-hdf5-test:
 
 
 delete: template
-	kubectl -n $(KUBE_NAMESPACE) delete -f mpi.yml
+	kubectl -n $(KUBE_NAMESPACE) delete -f mpi.yml || true
 
 rmi:
 	$(DOCKER) rmi $(DOCKER_IMAGE)

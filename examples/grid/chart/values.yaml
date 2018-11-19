@@ -104,3 +104,5 @@ appCodesToSync:
 #   fetchWaitSecond: "120"
 #   mountPath: /your-secret-repo
 #   gitSecretName: git-sync-creds
+
+shares: ["data", "cache"]

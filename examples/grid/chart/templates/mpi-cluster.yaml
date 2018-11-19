@@ -25,6 +25,36 @@ metadata:
     heritage: {{ .Release.Service }}
     role: worker
 spec:
+  # volumeClaimTemplates:
+  # - metadata:
+  #     name: cache-volume
+  #   spec:
+  #     accessModes:
+  #       - ReadWriteOnce
+  #     resources:
+  #       requests:
+  #         storage: 10Gi
+  #     selector:
+  #       matchExpressions:
+  #       - key: name
+  #         operator: In
+  #         values: ["gridcache-"]
+  #     storageClassName: beegfs
+  # - metadata:
+  #     name: grid-data
+  #   spec:
+  #     accessModes:
+  #       - ReadWriteOnce
+  #     resources:
+  #       requests:
+  #         storage: 10Gi
+  #     selector:
+  #       matchExpressions:
+  #       - key: name
+  #         operator: In
+  #         values: ["griddata-"]
+  #     storageClassName: beegfs
+
   selector:
     matchLabels:
       app: {{ template "..name" . }}
